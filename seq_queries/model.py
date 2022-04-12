@@ -38,7 +38,7 @@ class LM(ABC):
         pass
 
     @abstractmethod
-    def get_next_probs(self, src, rnn_args, temperature, **kwargs):
+    def get_next_probs(self, src, rnn_args, temperature, return_logits=False, **kwargs):
         pass
 
 
@@ -91,7 +91,7 @@ class CausalLM(LM, nn.Module):
         return output
 
     def get_next_probs(self, x, rnn_args=None, temperature=1.0,
-                         max_batch_size = 128, device = 'cpu'):
+                         max_batch_size=128, device='cpu', return_log_prob=False, **kwargs):
         """Computes the probability distribution over the vocabulary for the next
         term in a sequence. Returns this and resulting hidden state. Can specify a
         temperature to divide the logits by prior to performing a softmax to change
@@ -116,8 +116,11 @@ class CausalLM(LM, nn.Module):
                     f"Sizes were x: {x.shape[0]}, rnn1 {rnn_arg[0].shape[1]}, rnn2 {rnn_arg[1].shape[1]}"
             elif rnn_arg is not None: rnn_arg.to(device)
             step_output = self.forward(src=x.to(device), rnn_args=rnn_arg_cuda if rnn_arg else None)
-            logits = step_output["logits"][:, -1, :]  # last position in the sequence
-            probs = torch.softmax(logits / temperature, dim=-1)
+            logits = step_output["logits"][:, -1, :] / temperature # last position in the sequence
+            if return_log_prob:
+                probs = torch.log_softmax(logits, dim=-1)
+            else:
+                probs = torch.softmax(logits, dim=-1)
             prob_outputs.append(probs.cpu())
             step_outputs.append(_tup_cpu(step_output['misc_output']))
 
@@ -128,7 +131,8 @@ class CausalLM(LM, nn.Module):
             context = torch.cat(context, dim = 1)
             step_output = (hidden, context)
         # If we just have a single hidden state
-        else: step_output = torch.cat(step_outputs,dim = 1)
+        else: 
+            step_output = torch.cat(step_outputs,dim = 1)
 
         return torch.cat(prob_outputs,dim = 0), step_output
 
