@@ -63,9 +63,9 @@ def lm_proposal(hists, sample_len, model, vocab_size, excluded_terms, top_k=0, t
         proposal_logits[..., excluded_terms] = -float('inf')
         proposal_logits = torch.log_softmax(top_k_top_p_filtering(proposal_logits/temperature, top_k=top_k, top_p=top_p), dim=-1)
 
-        last_sample = torch.distributions.Categorical(logits=proposal_logits).sample()
-        proposal_log_prob += torch.gather(proposal_logits, dim=-1, index=last_sample.unsqueeze(-1)).squeeze(-1)
-        model_log_prob += torch.gather(torch.log_softmax(logits, dim=-1), dim=-1, index=last_sample.unsqueeze(-1)).squeeze(-1)
+        last_sample = torch.distributions.Categorical(logits=proposal_logits).sample().unsqueeze(-1)
+        proposal_log_prob += torch.gather(proposal_logits, dim=-1, index=last_sample).squeeze(-1)
+        model_log_prob += torch.gather(torch.log_softmax(logits, dim=-1), dim=-1, index=last_sample).squeeze(-1)
         samples.append(last_sample)
 
     output = model(src=last_sample, rnn_args=rnn_args)  # get last subsequent distribution
