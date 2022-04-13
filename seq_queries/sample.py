@@ -96,7 +96,7 @@ def mc_estimate(hist, num_mc_samples, sample_len, model, excluded_terms, args, p
             temperature=args.temperature,
         )
         remaining_samples -= args.batch_size
-        term_log_prob = sample_out["next_log_dist"] + sample_out["model_log_prob"] - sample_out["proposal_log_prob"]
+        term_log_prob = sample_out["next_log_dist"] + sample_out["model_log_prob"].unsqueeze(-1) - sample_out["proposal_log_prob"]
         dist_estimate += term_log_prob.exp().sum() / num_mc_samples
 
     return dist_estimate
