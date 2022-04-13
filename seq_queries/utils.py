@@ -160,7 +160,7 @@ def flatten(list_of_lists):
     """Turn a list of lists (or any iterable) into a flattened list."""
     return [item for sublist in list_of_lists for item in sublist]
 
-def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
+def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf'), is_log_prob=False):
     """ Filter a distribution of logits using top-k and/or nucleus (top-p) filtering.
         Currently only supports a batch size of 1.
         Adapted from https://gist.github.com/thomwolf/1a5a29f6962089e871b94cbd09daf317
@@ -180,7 +180,10 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
 
     if top_p > 0.0:
         sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1) #torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+        if is_log_prob:
+            cumulative_probs = sorted_logits.exp().cumsum(dim=-1)
+        else:
+            cumulative_probs = sorted_logits.softmax(dim=-1).cumsum(dim=-1) #torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
 
         # Remove tokens with cumulative probability above the threshold
         sorted_indices_to_remove = cumulative_probs > top_p
