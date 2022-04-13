@@ -33,7 +33,7 @@ def uniform_proposal(hists, sample_len, model, vocab_size, excluded_terms, **kwa
     assert(len(hists.shape) == 2)
 
     # Uniformly sample across the restricted vocabulary indices
-    samples = torch.randint(low=0, high=vocab_size-1-len(excluded_terms), size=(hists.shape[0], sample_len), device=hists.device)
+    samples = torch.randint(low=0, high=vocab_size-len(excluded_terms), size=(hists.shape[0], sample_len), device=hists.device)
     for item in sorted(excluded_terms):
         samples[samples>=item] += 1
     assert(samples.max() < vocab_size)
