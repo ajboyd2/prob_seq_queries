@@ -49,7 +49,7 @@ def uniform_proposal(hists, sample_len, model, vocab_size, excluded_terms, **kwa
         "next_log_dist": torch.log_softmax(output["logits"], dim=-1)[..., -1, :],
     }
 
-def lm_proposal(hists, sample_len, model, excluded_terms, top_k=0, top_p=1.0, temperature=1.0, **kwargs):
+def lm_proposal(hists, sample_len, model, vocab_size, excluded_terms, top_k=0, top_p=1.0, temperature=1.0, **kwargs):
     assert(len(hists.shape) == 2)
 
     proposal_log_prob, model_log_prob = 0.0, 0.0
@@ -89,6 +89,7 @@ def mc_estimate(hist, num_mc_samples, sample_len, model, excluded_terms, args, p
             hists=hist.unsqueeze(0).expand(min(remaining_samples, args.batch_size), -1),
             sample_len=sample_len,
             model=model,
+            vocab_size=args.vocab_size,
             excluded_terms=excluded_terms,
             top_k=args.top_k,
             top_p=args.top_p,
