@@ -125,25 +125,24 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
         next_log_probs = next_log_probs.view(-1)
 
         if isinstance(num_beams, int):
-            next_log_probs = top_k_top_p_filtering(next_log_probs, top_k=num_beams)
+            next_log_probs = top_k_top_p_filtering(next_log_probs, top_k=num_beams, is_log_prob=True)
         else:  # isinstance(num_beams, float)
             num_beams_cur = interp_func(num_beams, n_cur, sample_len)
-            next_log_probs = top_k_top_p_filtering(next_log_probs, top_p=num_beams_cur)
-
+            next_log_probs = top_k_top_p_filtering(next_log_probs, top_p=num_beams_cur, is_log_prob=True)
+            
         indices = torch.arange(0, next_log_probs.shape[0], device=beams.device)[next_log_probs != -float('inf')]
-        seq_inds = indices // args.vocab_size
-        beams = indices % args.vocab_size
-        cur_log_probs = next_log_probs
+        seq_inds = torch.div(indices, args.vocab_size, rounding_mode='trunc')  # equivalent to: indices // args.vocab_size
+        beams = (indices % args.vocab_size).unsqueeze(-1)
+        cur_log_probs = next_log_probs[indices]
         rnn_args = output["misc_output"]
         if isinstance(rnn_args, tuple):
             rnn_args = rnn_args[0][..., seq_inds, :], rnn_args[1][..., seq_inds, :]
         else:
             rnn_args = rnn_args[..., seq_inds, :]
-    
+            
     output = model(src=beams, rnn_args=rnn_args)
-    next_log_probs = torch.log_softmax(output["logits"], dim=-1) + cur_log_probs.unsqueeze(-1)
+    next_log_probs = cur_log_probs.unsqueeze(-1) + torch.log_softmax(output["logits"][..., -1, :], dim=-1)
     return next_log_probs.exp().sum(dim=0)
-
 
 
 #################################################################################
