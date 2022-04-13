@@ -118,6 +118,7 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
     beams, rnn_args = hist.unsqueeze(0), None  # beams only represents what needs to be processed by the model in the next step
     cur_log_probs = torch.zeros((1,), dtype=torch.float32, device=beams.device)  # (num of current beams,)
     cur_restricted_log_probs = cur_log_probs.clone()  # sum of restricted probabilities
+    num_beams_over_time = []
     for n_cur in range(sample_len):
         output = model(src=beams, rnn_args=rnn_args)
         next_log_probs = torch.log_softmax(output["logits"][..., -1, :], dim=-1)  # (num of current beams, vocab_size)
@@ -145,6 +146,8 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
             rnn_args = rnn_args[0][..., seq_inds, :], rnn_args[1][..., seq_inds, :]
         else:
             rnn_args = rnn_args[..., seq_inds, :]
+
+        num_beams_over_time.append(cur_log_probs.shape[0])
             
     output = model(src=beams, rnn_args=rnn_args)
     next_log_probs = cur_log_probs.unsqueeze(-1) + torch.log_softmax(output["logits"][..., -1, :], dim=-1)
@@ -152,6 +155,7 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
         "dist_lower_bound": next_log_probs.exp().sum(dim=0), 
         "true_coverage": cur_log_probs.exp().sum(), 
         "restricted_coverage": cur_restricted_log_probs.exp().sum(),
+        "num_beams": num_beams_over_time,
     }
 
 
