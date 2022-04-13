@@ -117,23 +117,29 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
 
     beams, rnn_args = hist.unsqueeze(0), None  # beams only represents what needs to be processed by the model in the next step
     cur_log_probs = torch.zeros((1,), dtype=torch.float32, device=beams.device)  # (num of current beams,)
+    cur_restricted_log_probs = cur_log_probs.clone()  # sum of restricted probabilities
     for n_cur in range(sample_len):
         output = model(src=beams, rnn_args=rnn_args)
         next_log_probs = torch.log_softmax(output["logits"][..., -1, :], dim=-1)  # (num of current beams, vocab_size)
         next_log_probs[..., excluded_terms] = -float('inf')
+        next_restricted_log_probs = torch.log_softmax(next_log_probs, dim=-1)
         next_log_probs = cur_log_probs.unsqueeze(-1) + next_log_probs
         next_log_probs = next_log_probs.view(-1)
+        next_restricted_log_probs = cur_restricted_log_probs.unsqueeze(-1) + next_restricted_log_probs
+        next_restricted_log_probs = next_restricted_log_probs.view(-1)
 
         if isinstance(num_beams, int):
-            next_log_probs = top_k_top_p_filtering(next_log_probs, top_k=num_beams, is_log_prob=True)
+            next_restricted_log_probs = top_k_top_p_filtering(next_restricted_log_probs, top_k=num_beams, is_log_prob=True)
         else:  # isinstance(num_beams, float)
             num_beams_cur = interp_func(num_beams, n_cur, sample_len)
-            next_log_probs = top_k_top_p_filtering(next_log_probs, top_p=num_beams_cur, is_log_prob=True)
+            next_restricted_log_probs = top_k_top_p_filtering(next_restricted_log_probs, top_p=num_beams_cur, is_log_prob=True)
             
+        next_log_probs.masked_fill(next_restricted_log_probs == -float('inf'), -float('inf'))
         indices = torch.arange(0, next_log_probs.shape[0], device=beams.device)[next_log_probs != -float('inf')]
         seq_inds = torch.div(indices, args.vocab_size, rounding_mode='trunc')  # equivalent to: indices // args.vocab_size
         beams = (indices % args.vocab_size).unsqueeze(-1)
         cur_log_probs = next_log_probs[indices]
+        cur_restricted_log_probs = next_restricted_log_probs[indices]
         rnn_args = output["misc_output"]
         if isinstance(rnn_args, tuple):
             rnn_args = rnn_args[0][..., seq_inds, :], rnn_args[1][..., seq_inds, :]
@@ -142,7 +148,11 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
             
     output = model(src=beams, rnn_args=rnn_args)
     next_log_probs = cur_log_probs.unsqueeze(-1) + torch.log_softmax(output["logits"][..., -1, :], dim=-1)
-    return next_log_probs.exp().sum(dim=0)
+    return {
+        "dist_lower_bound": next_log_probs.exp().sum(dim=0), 
+        "true_coverage": cur_log_probs.sum(), 
+        "restricted_coverage": cur_restricted_log_probs.sum(),
+    }
 
 
 #################################################################################
