@@ -44,7 +44,7 @@ def uniform_proposal(hists, sample_len, model, vocab_size, excluded_terms, **kwa
 
     return {
         "proposal_log_prob": -sample_len * np.log(vocab_size - len(excluded_terms)),
-        "model_log_prob": model_log_prob,
+        "model_log_prob": model_log_prob.unsqueeze(-1),
         "samples": samples,
         "next_log_dist": torch.log_softmax(output["logits"], dim=-1)[..., -1, :],
     }
@@ -73,8 +73,8 @@ def lm_proposal(hists, sample_len, model, vocab_size, excluded_terms, top_k=0, t
     samples = torch.cat(samples, dim=-1)
 
     return {
-        "proposal_log_prob": proposal_log_prob,
-        "model_log_prob": model_log_prob,
+        "proposal_log_prob": proposal_log_prob.unsqueeze(-1),
+        "model_log_prob": model_log_prob.unsqueeze(-1),
         "samples": samples,
         "next_log_dist": torch.log_softmax(output["logits"], dim=-1)[..., -1, :],
     }
@@ -96,7 +96,7 @@ def mc_estimate(hist, num_mc_samples, sample_len, model, excluded_terms, args, p
             temperature=args.temperature,
         )
         remaining_samples -= args.batch_size
-        term_log_prob = sample_out["next_log_dist"] + sample_out["model_log_prob"].unsqueeze(-1) - sample_out["proposal_log_prob"]
+        term_log_prob = sample_out["next_log_dist"] + sample_out["model_log_prob"] - sample_out["proposal_log_prob"]
         dist_estimate += term_log_prob.exp().sum() / num_mc_samples
 
     return dist_estimate
