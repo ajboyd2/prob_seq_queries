@@ -115,10 +115,10 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
     assert(len(hist.shape) == 1)
 
     beams, rnn_args = hist.unsqueeze(0), None  # beams only represents what needs to be processed by the model in the next step
-    cur_log_probs = torch.zeros((1,), dtype=torch.float32, device=beams.device)
+    cur_log_probs = torch.zeros((1,), dtype=torch.float32, device=beams.device)  # (num of current beams,)
     for n_cur in range(sample_len):
         output = model(src=beams, rnn_args=rnn_args)
-        next_log_probs = torch.log_softmax(output["logits"], dim=-1)
+        next_log_probs = torch.log_softmax(output["logits"], dim=-1)  # (num of current beams, vocab_size)
         next_log_probs[..., excluded_terms] = -float('inf')
         next_log_probs = cur_log_probs.unsqueeze(-1) + next_log_probs
         next_log_probs = next_log_probs.view(-1)
@@ -135,13 +135,13 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
         cur_log_probs = next_log_probs
         rnn_args = output["misc_output"]
         if isinstance(rnn_args, tuple):
-            rnn_args = rnn_args[0][seq_inds, :], rnn_args[1][seq_inds, :]
+            rnn_args = rnn_args[0][..., seq_inds, :], rnn_args[1][..., seq_inds, :]
         else:
-            rnn_args = rnn_args[seq_inds, :]
+            rnn_args = rnn_args[..., seq_inds, :]
     
     output = model(src=beams, rnn_args=rnn_args)
     next_log_probs = torch.log_softmax(output["logits"], dim=-1) + cur_log_probs.unsqueeze(-1)
-    return next_log_probs.exp().sum()
+    return next_log_probs.exp().sum(dim=0)
 
 
 
