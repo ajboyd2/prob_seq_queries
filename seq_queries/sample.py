@@ -57,7 +57,7 @@ def lm_proposal(hists, sample_len, model, excluded_terms, top_k=0, top_p=1.0, te
     last_sample, rnn_args = hists, None
     for _ in range(sample_len):
         output = model(src=last_sample, rnn_args=rnn_args)
-        logits, rnn_args = output["logits"], output["misc_output"]
+        logits, rnn_args = output["logits"][..., -1, :], output["misc_output"]
         
         proposal_logits = logits.clone()
         proposal_logits[..., excluded_terms] = -float('inf')
@@ -118,7 +118,7 @@ def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, 
     cur_log_probs = torch.zeros((1,), dtype=torch.float32, device=beams.device)  # (num of current beams,)
     for n_cur in range(sample_len):
         output = model(src=beams, rnn_args=rnn_args)
-        next_log_probs = torch.log_softmax(output["logits"], dim=-1)  # (num of current beams, vocab_size)
+        next_log_probs = torch.log_softmax(output["logits"][..., -1, :], dim=-1)  # (num of current beams, vocab_size)
         next_log_probs[..., excluded_terms] = -float('inf')
         next_log_probs = cur_log_probs.unsqueeze(-1) + next_log_probs
         next_log_probs = next_log_probs.view(-1)
