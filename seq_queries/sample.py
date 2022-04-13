@@ -86,7 +86,7 @@ def mc_estimate(hist, num_mc_samples, sample_len, model, excluded_terms, args, p
     remaining_samples = num_mc_samples
     while remaining_samples > 0:
         sample_out = proposal_func(
-            hists=hist.unsqueeze(0).expand(min(remaining_samples, args.batch_size)),
+            hists=hist.unsqueeze(0).expand(min(remaining_samples, args.batch_size), -1),
             sample_len=sample_len,
             model=model,
             excluded_terms=excluded_terms,
