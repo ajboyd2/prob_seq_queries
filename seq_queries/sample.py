@@ -108,7 +108,7 @@ def lin_interp(target_pct, n_current, n_end):
     a = geom_interp(target_pct=target_pct, n_current=0, n_end=n_end)
     b = target_pct
     t = n_current / (n_end - 1)
-    return a * t + b * (1 - t)
+    return a * (1 - t) + b * t
 
 @torch.no_grad()
 def beam_search_lower_bound(hist, num_beams, sample_len, model, excluded_terms, args, interp_func):
